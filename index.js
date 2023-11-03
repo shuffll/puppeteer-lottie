@@ -55,6 +55,7 @@ const injectLottie = `
  * @param {string} [opts.inject.body] - Optionally injected into the document <body>
  * @param {object} [opts.browser] - Optional puppeteer instance to reuse
  * @param {object} [opts.progress] - Optional callback to report rendering progress, will be called with the following parameters: (frame, totalFrames)
+ * @param {object} [opts.jumpTo] - Optional callback to report rendering progress, will be called with the following parameters: (frame, totalFrames)
  * @return {Promise}
  */
 module.exports = async (opts) => {
@@ -369,7 +370,12 @@ ${inject.body || ''}
     if(shuffll){
       /// If the jumpToExists, go to the matching frame
       // eslint-disable-next-line no-undef
-      await page.evaluate((frame) => animation.goToAndStop(jumpTo? Number(jumpTo): 0, true), frame)
+
+      let goToFrame = 0;
+      if(jumpTo){
+        goToFrame = Number(jumpTo)
+      }
+      await page.evaluate((frame) => animation.goToAndStop(goToFrame, true), frame)
 
       const screenshot = await rootHandle.screenshot({
         ...screenshotOpts,
