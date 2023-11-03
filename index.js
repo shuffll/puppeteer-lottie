@@ -375,7 +375,7 @@ ${inject.body || ''}
       if(jumpTo){
         goToFrame = jumpTo
       }
-      await page.evaluate((frame) => animation.goToAndStop(goToFrame, true), frame)
+      await page.evaluate((goToFrame) => animation.goToAndStop(goToFrame, true), goToFrame)
 
       const screenshot = await rootHandle.screenshot({
         ...screenshotOpts,
