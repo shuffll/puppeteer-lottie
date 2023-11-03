@@ -79,6 +79,8 @@ module.exports = async (opts) => {
       quality: 80,
       fast: false
     },
+    shuffll = true,
+    jumpTo = undefined,
     progress = undefined
   } = opts
 
@@ -131,6 +133,7 @@ module.exports = async (opts) => {
   const isMultiFrame = isApng || isMp4 || /%d|%\d{2,3}d/.test(tempOutput)
 
   let lottieData = animationData
+  let base64;
 
   if (animationPath) {
     if (animationData) {
@@ -362,27 +365,51 @@ ${inject.body || ''}
       ? sprintf(tempOutput, frame + 1)
       : tempOutput
 
-    // eslint-disable-next-line no-undef
-    await page.evaluate((frame) => animation.goToAndStop(frame, true), frame)
-    const screenshot = await rootHandle.screenshot({
-      path: (isApng || isMp4) ? undefined : frameOutputPath,
-      ...screenshotOpts
-    })
-    
-    if(progress) {
-      progress(frame, numFrames)
-    }
 
-    // single screenshot
-    if (!isMultiFrame) {
-      break
-    }
+    if(shuffll){
+      /// If the jumpToExists, go to the matching frame
+      // eslint-disable-next-line no-undef
+      await page.evaluate((frame) => animation.goToAndStop(jumpTo? Number(jumpTo): 0, true), frame)
 
-    if (isApng || isMp4) {
-      if (ffmpegStdin.writable) {
-        ffmpegStdin.write(screenshot)
+      const screenshot = await rootHandle.screenshot({
+        ...screenshotOpts,
+        encoding: 'base64' // get a base64 string
+      });
+      // Do something with the base64 string, e.g., return it or resolve it in the promise
+
+      // single screenshot
+      base64 =  `data:image/png;base64,${screenshot}`;
+      if(progress) {
+        progress(frame, numFrames, base64)
+      }
+
+    }
+    else {
+      // eslint-disable-next-line no-undef
+      await page.evaluate((frame) => animation.goToAndStop(frame, true), frame)
+
+
+      const screenshot = await rootHandle.screenshot({
+        path: (isApng || isMp4) ? undefined : frameOutputPath,
+        ...screenshotOpts
+      })
+
+      if(progress) {
+        progress(frame, numFrames)
+      }
+
+      // single screenshot
+      if (!isMultiFrame) {
+        break
+      }
+
+      if (isApng || isMp4) {
+        if (ffmpegStdin.writable) {
+          ffmpegStdin.write(screenshot)
+        }
       }
     }
+
   }
 
   await rootHandle.dispose()
@@ -436,6 +463,7 @@ ${inject.body || ''}
 
   return {
     numFrames,
-    duration
+    duration,
+
   }
 }
