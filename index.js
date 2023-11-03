@@ -373,7 +373,7 @@ ${inject.body || ''}
 
       let goToFrame = 0;
       if(jumpTo){
-        goToFrame = Number(jumpTo)
+        goToFrame = jumpTo
       }
       await page.evaluate((frame) => animation.goToAndStop(goToFrame, true), frame)
 
