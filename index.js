@@ -55,7 +55,8 @@ const injectLottie = `
  * @param {string} [opts.inject.body] - Optionally injected into the document <body>
  * @param {object} [opts.browser] - Optional puppeteer instance to reuse
  * @param {object} [opts.progress] - Optional callback to report rendering progress, will be called with the following parameters: (frame, totalFrames)
- * @param {object} [opts.jumpTo] - Optional callback to report rendering progress, will be called with the following parameters: (frame, totalFrames)
+ * @param {object} [opts.jumpTo] - start from this frame
+ * @param {object} [opts.takeFrames] - start from this frame. if not set - will continue to the end. 1 means it will only take the first frame from jumpTo
  * @return {Promise}
  */
 module.exports = async (opts) => {
@@ -67,10 +68,10 @@ module.exports = async (opts) => {
     quiet = false,
     deviceScaleFactor = 1,
     renderer = 'svg',
-    rendererSettings = { },
-    style = { },
-    inject = { },
-    puppeteerOptions = { },
+    rendererSettings = {},
+    style = {},
+    inject = {},
+    puppeteerOptions = {},
     ffmpegOptions = {
       crf: 20,
       profileVideo: 'main',
@@ -82,6 +83,7 @@ module.exports = async (opts) => {
     },
     shuffll = true,
     jumpTo = undefined,
+    takeFrames = 0,
     progress = undefined
   } = opts
 
@@ -92,7 +94,7 @@ module.exports = async (opts) => {
 
   ow(output, ow.string.nonEmpty, 'output')
   ow(deviceScaleFactor, ow.number.integer.positive, 'deviceScaleFactor')
-  ow(renderer, ow.string.oneOf([ 'svg', 'canvas', 'html' ], 'renderer'))
+  ow(renderer, ow.string.oneOf(['svg', 'canvas', 'html'], 'renderer'))
   ow(rendererSettings, ow.object.plain, 'rendererSettings')
   ow(puppeteerOptions, ow.object.plain, 'puppeteerOptions')
   ow(ffmpegOptions, ow.object.exactShape({
@@ -134,7 +136,7 @@ module.exports = async (opts) => {
   const isMultiFrame = isApng || isMp4 || /%d|%\d{2,3}d/.test(tempOutput)
 
   let lottieData = animationData
-  let base64;
+  let base64
 
   if (animationPath) {
     if (animationData) {
@@ -360,47 +362,42 @@ ${inject.body || ''}
       ffmpegStdin = stdin
     })
   }
+  if (shuffll) {
 
-  for (let frame = 0; frame < numFrames; ++frame) {
-    const frameOutputPath = isMultiFrame
-      ? sprintf(tempOutput, frame + 1)
-      : tempOutput
+    let startFrom = jumpTo?? 0
+    let endFrame  = takeFrames? startFrom+takeFrames : numFrames
 
-
-    if(shuffll){
-      /// If the jumpToExists, go to the matching frame
+    /// If the jumpTo exists, go to the matching frame
+    for (let frame = startFrom; frame < endFrame; ++frame) {
       // eslint-disable-next-line no-undef
-
-      let goToFrame = 0;
-      if(jumpTo){
-        goToFrame = jumpTo
-      }
-      await page.evaluate((goToFrame) => animation.goToAndStop(goToFrame, true), goToFrame)
-
+      await page.evaluate((frame) => animation.goToAndStop(frame, true), frame)
       const screenshot = await rootHandle.screenshot({
         ...screenshotOpts,
         encoding: 'base64' // get a base64 string
-      });
-      // Do something with the base64 string, e.g., return it or resolve it in the promise
+      })
 
-      // single screenshot
-      base64 =  `data:image/png;base64,${screenshot}`;
-      if(progress) {
-        progress(frame, numFrames, base64)
+      base64 = `data:image/png;base64,${screenshot}`
+      // Return the base64 string via the callback
+
+      if (progress) {
+        progress({frame, endFrame, base64 })
       }
-
     }
-    else {
+  } else {
+    for (let frame = 0; frame < numFrames; ++frame) {
+      const frameOutputPath = isMultiFrame
+        ? sprintf(tempOutput, frame + 1)
+        : tempOutput
+
       // eslint-disable-next-line no-undef
       await page.evaluate((frame) => animation.goToAndStop(frame, true), frame)
-
 
       const screenshot = await rootHandle.screenshot({
         path: (isApng || isMp4) ? undefined : frameOutputPath,
         ...screenshotOpts
       })
 
-      if(progress) {
+      if (progress) {
         progress(frame, numFrames)
       }
 
@@ -454,7 +451,7 @@ ${inject.body || ''}
     ].filter(Boolean)
 
     const executable = process.env.GIFSKI_PATH || 'gifski'
-    const cmd = [ executable ].concat(params).join(' ')
+    const cmd = [executable].concat(params).join(' ')
 
     await execa.shell(cmd)
 
